@@ -3,7 +3,7 @@
 /*
 Plugin Name: ACF QuickEdit Fields
 Plugin URI: http://wordpress.org/
-Description: Enter description here.
+Description: Quick edit fields for ACF updated to include sort order.
 Author: Jörn Lund
 Version: 1.0.0
 Author URI: 
@@ -202,21 +202,72 @@ class ACFToQuickEdit {
 		}
 		if ( count( $this->column_fields ) ) {
 			if ( 'post' == $post_type ) {
-				$cols_hook		= 'manage_posts_columns';
-				$display_hook	= 'manage_posts_custom_column';
+				$cols_hook		= "manage_posts_columns";
+				$display_hook	= "manage_posts_custom_column";
+				$display_order	= 'manage_edit-post_sortable_columns';
 			} else if ( 'page' == $post_type ) {
 				$cols_hook		= 'manage_pages_columns';
 				$display_hook	= 'manage_pages_custom_column';
+				$display_order	= 'manage_edit-pages_sortable_columns';
 			} else if ( 'attachment' == $post_type ) {
 				$cols_hook		= 'manage_media_columns';
 				$display_hook	= 'manage_media_custom_column';
+				$display_order	= 'manage_edit-media_sortable_columns';
 			} else {
 				$cols_hook		= "manage_{$post_type}_posts_columns";
 				$display_hook	= "manage_{$post_type}_posts_custom_column";
+				$display_order	= "manage_edit-{$post_type}_sortable_columns";
 			}
 			add_filter( $cols_hook ,    array( &$this , 'add_field_columns' ) );
 			add_filter( $cols_hook , 	array( &$this , 'move_date_to_end' ) );
 			add_filter( $display_hook , array( &$this , 'display_field_column' ) , 10 , 2 );
+
+			add_filter( $display_order , array( &$this , 'acf_sortable_columns' ) );
+
+
+	
+			/* Only run our customization on the 'edit.php' page in the admin. */
+			add_action( 'load-edit.php', 'edit_acf_load' );
+
+				function edit_acf_load() {
+					add_filter( 'request', 'sort_acf' );
+				}
+				
+				# TODO: Fix this to pull current post type and columns rather than hard coding each
+				function sort_acf( $vars ) {
+					/* Check if we're viewing the 'ingredient' post type. */
+					if ( isset( $vars['post_type'] ) && 'ingredient' == $vars['post_type'] ) {
+						
+
+						/* Check if 'orderby' is set to 'stock_level'. */
+						if ( isset( $vars['orderby'] ) && 'stock_level' == $vars['orderby'] ) {
+							/* Merge the query vars with our custom variables. */
+							$vars = array_merge(
+								$vars,
+								array(
+									'meta_key' => 'stock_level',
+									'orderby' => 'meta_value_num'
+								)
+							);
+						}
+						if ( isset( $vars['orderby'] ) && 'pack_size' == $vars['orderby'] ) {
+							/* Merge the query vars with our custom variables. */
+							$vars = array_merge(
+								$vars,
+								array(
+									'meta_key' => 'pack_size',
+									'orderby' => 'meta_value_num'
+								)
+							);
+						}
+
+							
+						
+					}
+
+					return $vars;
+				}
+
 		}
 		if ( count( $this->quickedit_fields ) ) {
 			add_action( 'quick_edit_custom_box',  array(&$this,'display_quick_edit') , 10, 2);
@@ -341,7 +392,18 @@ class ACFToQuickEdit {
 	    $defaults['date'] = $date;
 	    return $defaults; 
 	} 
-	
+
+	function acf_sortable_columns( $columns ) {
+	/*	$columns['stock_level'] = 'stock_level';
+		return $columns;
+	*/
+		foreach ( $this->column_fields as $field_slug => $field ) {
+			$columns[ $field_slug ] = $field['name'];
+		}
+		return $columns;
+	}
+
+
 	function display_quick_edit( $column, $post_type ) {
 		if ( isset($this->quickedit_fields[$column]) && $field = $this->quickedit_fields[$column] ) {
 			$this->display_quickedit_field( $column, $post_type , $field  );
